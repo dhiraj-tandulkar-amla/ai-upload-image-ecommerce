@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "name": "Nike Red Running Shoe",
+    "category": "shoe",
+    "color": "red",
+    "brand": "nike",
+    "price": 2499,
+    "image": "/products/red-shoe.jpg",
+    "rating": 4.5
+  },
+  {
+    "id": 2,
+    "name": "Adidas Blue Sports Shoe",
+    "category": "shoe",
+    "color": "blue",
+    "brand": "adidas",
+    "price": 2999,
+    "image": "/products/blue-shoe.jpg",
+    "rating": 4.3
+  },
+  {
+    "id": 3,
+    "name": "Puma Black Casual Shoe",
+    "category": "shoe",
+    "color": "black",
+    "brand": "puma",
+    "price": 2199,
+    "image": "/products/black-shoe.jpg",
+    "rating": 4.1
+  },
+  {
+    "id": 4,
+    "name": "Nike Red T-Shirt",
+    "category": "tshirt",
+    "color": "red",
+    "brand": "nike",
+    "price": 999,
+    "image": "/products/red-tshirt.jpg",
+    "rating": 4.2
+  },
+  {
+    "id": 5,
+    "name": "Apple Smart Watch",
+    "category": "watch",
+    "color": "black",
+    "brand": "apple",
+    "price": 25999,
+    "image": "/products/watch.jpg",
+    "rating": 4.8
+  }
+]
