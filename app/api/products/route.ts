@@ -1,44 +1,108 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { search } = await req.json();
+  try {
+    const { search } = await req.json();
+    const normalizedSearch = (search || "").toString().trim();
 
-  const url =
-    `https://apigateways-z10-dev4.znodecorp.com/v2.1/search/${search}/full-text-search` +
-    `?expand=Promotions,Pricing,AssociatedProducts,Seo,facet,highlights` +
-    `&filter=IsGetAllLocationsInventory~eq~false,PortalId~eq~7,IsProductInheritanceEnabled~eq~true` +
-    `&pageIndex=1` +
-    `&pageSize=12` +
-    `&LocaleCode=en-US` +
-    `&CatalogCode=MaxwellsHardware` +
-    `&storeCode=MaxwellsHardware` +
-    `&IsFacetList=true` +
-    `&UseSuggestion=true` +
-    `&RefineBy={}` +
-    `&IsProductInheritanceEnabled=true`;
+    if (!normalizedSearch) {
+      return NextResponse.json(
+        { error: "Search text is required" },
+        { status: 400 },
+      );
+    }
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      accept: "application/json",
+    const apiBaseUrl = process.env.ZNODE_API_BASE_URL;
+    const portalCode = process.env.ZNODE_PORTAL_CODE;
+    const catalogCode = process.env.ZNODE_CATALOG_CODE;
+    const storeCode = process.env.ZNODE_STORE_CODE;
+    const localeCode = process.env.ZNODE_LOCALE_CODE;
+    const rawDomainName = process.env.ZNODE_DOMAIN_NAME;
 
-      authorization: process.env.ZNODE_AUTH!,
+    if (
+      !apiBaseUrl ||
+      !portalCode ||
+      !catalogCode ||
+      !storeCode ||
+      !localeCode ||
+      !rawDomainName
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Missing ZNode config. Required: ZNODE_API_BASE_URL, ZNODE_PORTAL_CODE, ZNODE_CATALOG_CODE, ZNODE_STORE_CODE, ZNODE_LOCALE_CODE, ZNODE_DOMAIN_NAME",
+        },
+        { status: 500 },
+      );
+    }
 
-      "cache-control": "no-store",
+    const domainName = rawDomainName
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/.*$/, "");
 
-      "z-request-context": process.env.ZNODE_CONTEXT!,
+    const query =
+      `expand=Promotions,Pricing,AssociatedProducts,Seo,facet,highlights` +
+      `&filter=IsGetAllLocationsInventory~eq~false,PortalId~eq~7,IsProductInheritanceEnabled~eq~true` +
+      `&pageIndex=1` +
+      `&pageSize=12` +
+      `&LocaleCode=${encodeURIComponent(localeCode)}` +
+      `&CatalogCode=${encodeURIComponent(catalogCode)}` +
+      `&storeCode=${encodeURIComponent(storeCode)}` +
+      `&IsFacetList=true` +
+      `&UseSuggestion=true` +
+      `&RefineBy={}` +
+      `&IsProductInheritanceEnabled=true`;
 
-      "znode-domainname": "localhost:3000",
+    const url = `${apiBaseUrl}/v2.1/search/${encodeURIComponent(normalizedSearch)}/full-text-search?${query}`;
 
-      "znode-localecode": "en-US",
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: process.env.ZNODE_AUTH || "",
+        "cache-control": "no-store",
+        ...(process.env.ZNODE_CONTEXT
+          ? { "z-request-context": process.env.ZNODE_CONTEXT }
+          : {}),
+        "znode-domainname": domainName,
+        "znode-localecode": localeCode,
+        "znode-portalcode": portalCode,
+        "znode-publishstate": "Production",
+      },
+    });
 
-      "znode-portalcode": "MaxwellsHardware",
+    const rawData = await response.json();
+    const data = typeof rawData === "string" ? JSON.parse(rawData) : rawData;
 
-      "znode-publishstate": "Production",
-    },
-  });
+    if (!response.ok || data?.HasError) {
+      console.error("ZNode search failed", {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: data?.ErrorCode,
+        errorMessage: data?.ErrorMessage,
+      });
 
-  const data = await response.json();
+      return NextResponse.json(
+        {
+          error: data?.ErrorMessage || "ZNode search failed",
+          errorCode: data?.ErrorCode,
+          upstreamStatus: response.status,
+        },
+        { status: response.ok ? 502 : response.status },
+      );
+    }
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error("Products search route error", {
+      message: error?.message,
+      stack: error?.stack,
+    });
+
+    return NextResponse.json(
+      { error: error?.message || "Failed to fetch products" },
+      { status: 500 },
+    );
+  }
 }

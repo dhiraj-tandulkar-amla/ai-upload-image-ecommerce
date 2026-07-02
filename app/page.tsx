@@ -7,7 +7,8 @@ import Layout from "@/components/Layout";
 export default function HomePage() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
-  // const [imageName, setImageName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   const handleSearch = () => {
     if (!searchText.trim()) return;
@@ -15,46 +16,40 @@ export default function HomePage() {
   };
 
   const handleImageUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("image", file);
+    try {
+      setLoading(true);
+      setStatusText("Analyzing image...");
 
-    // Step 1: AI identifies the product
-    // const aiResponse = await fetch("/api/ai-search", {
-    //   method: "POST",
-    //   body: formData,
-    // });
+      const formData = new FormData();
+      formData.append("image", file);
 
-    // const aiData = await aiResponse.json();
-    const aiData = {
-      brand: "dewalt",
-      category: "drill",
-      color: "yellow"
+      const aiResponse = await fetch("/api/ai-search", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!aiResponse.ok) {
+        throw new Error(`Failed to upload: ${aiResponse.statusText}`);
+      }
+
+      const aiData = await aiResponse.json();
+
+      if (aiData.error) {
+        throw new Error(aiData.error);
+      }
+
+      if (aiData.keyword) {
+        setStatusText(`Found: "${aiData.keyword}". Redirecting...`);
+        router.push(`/products?search=${encodeURIComponent(aiData.keyword)}`);
+      } else {
+        throw new Error("No search keyword returned from AI");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "An error occurred during AI search.");
+      setLoading(false);
+      setStatusText("");
     }
-
-
-    console.log(aiData);
-
-    // Example:
-    // {
-    //   brand: "dewalt",
-    //   category: "drill",
-    //   color: "yellow"
-    // }
-
-    // Step 2: Search products
-    const productResponse = await fetch("/api/products", {
-      method: "POST",
-      body: JSON.stringify({
-        search: aiData.brand,
-      }),
-    });
-
-    const productData = await productResponse.json();
-
-    console.log(productData);
-
-    // Step 3:
-    // Save in Zustand/Context or navigate with state
   };
 
   return (
@@ -86,24 +81,25 @@ export default function HomePage() {
           </div>
 
           <div className="mt-8">
-            <label className="inline-block cursor-pointer rounded-lg bg-gray-900 px-6 py-3 text-white hover:bg-black">
-              Upload Product Image
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file);
-                }}
-              />
-            </label>
-
-            {/* {imageName && (
-              <p className="mt-3 text-sm text-gray-600">
-                Uploaded: {imageName}
-              </p>
-            )} */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-2">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                <p className="text-sm text-gray-600 font-medium">{statusText}</p>
+              </div>
+            ) : (
+              <label className="inline-block cursor-pointer rounded-lg bg-gray-900 px-6 py-3 text-white hover:bg-black transition-colors">
+                Upload Product Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
+              </label>
+            )}
           </div>
         </div>
       </section>
