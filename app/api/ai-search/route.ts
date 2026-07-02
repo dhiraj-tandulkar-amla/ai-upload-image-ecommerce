@@ -30,20 +30,18 @@ You are an expert product recognition AI.
 Analyze the uploaded product image and generate ONE optimized search keyword.
 
 Rules:
-- Include brand if identifiable.
-- Include product name.
-- Include model or series if visible.
-- Include variant/color/storage if useful.
-- Do not guess information that is not visible.
-- Return only the search keyword.
-- Do not return JSON.
-- Do not add explanations.
+- Keep the keyword concise, consistent, and search-friendly (ideally 2 to 4 words).
+- Avoid descriptive adjectives or fluff (e.g. do NOT add "high pressure", "plunger", "heavy duty", "original") unless they are part of the official brand or product name.
+- If the exact brand and model number/series are clearly visible, include them (e.g., "CAT Pumps 2537").
+- If the exact model/series is NOT clearly visible, keep the keyword generic (e.g., "CAT Pumps" or "Giant Pumps Parts").
+- Do not guess or assume details that are not visible.
+- Return only the search keyword on a single line. Do not return JSON or explanations.
 
 Examples:
-Apple iPhone 15 Pro Blue 256GB
-Samsung Galaxy S24 Ultra Titanium Black
-Nike Air Max 270 Black Running Shoes
-Sony WH-1000XM5 Wireless Headphones
+CAT Pumps 2537
+Nike Shoes
+Giant Pumps Plug
+AR North America Valve
             `,
             },
             {
@@ -73,17 +71,21 @@ Sony WH-1000XM5 Wireless Headphones
             {
               type: "input_text" as const,
               text: `
-Analyze this product image.
-
-Return ONLY the best search keyword.
+Analyze this product image and generate ONE optimized search keyword.
 
 Rules:
-- Include brand if visible.
-- Include product name.
-- Include model if visible.
-- Include variant/color/storage if useful.
-- Do not explain.
-- Return only one line.
+- Keep the keyword concise, consistent, and search-friendly (ideally 2 to 4 words).
+- Avoid descriptive adjectives or fluff (e.g. do NOT add "high pressure", "plunger", "heavy duty", "original") unless they are part of the official brand or product name.
+- If the exact brand and model number/series are clearly visible, include them (e.g., "CAT Pumps 2537").
+- If the exact model/series is NOT clearly visible, keep the keyword generic (e.g., "CAT Pumps" or "Giant Pumps Parts").
+- Do not guess or assume details that are not visible.
+- Return only the search keyword on a single line. Do not return JSON or explanations.
+
+Examples:
+CAT Pumps 2537
+Nike Shoes
+Giant Pumps Plug
+AR North America Valve
             `,
             },
             {
