@@ -20,7 +20,14 @@ export async function GET(req: Request) {
     const res = await query(
       `
       SELECT c.id, c.product_id as "productId", c.quantity, c.session_id as "sessionId", c.created_at as "createdAt",
-             p.name, p.brand, p.category, p.color, p.size, p.price, p.image, p.rating, p.sku
+             p.name, p.brand, p.category, p.color, p.size, p.price, p.rating, p.sku,
+             CASE
+               WHEN p.image IS NOT NULL AND p.image LIKE 'http%' AND LENGTH(p.image) > 15
+                 THEN p.image
+               WHEN p.attributes->>'image_url' IS NOT NULL AND p.attributes->>'image_url' LIKE 'http%'
+                 THEN p.attributes->>'image_url'
+               ELSE '/placeholder.svg'
+             END AS image
       FROM cart_items c
       JOIN products p ON c.product_id = p.id
       WHERE c.session_id = $1

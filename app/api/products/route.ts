@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query as dbQuery } from "@/lib/db";
 
+/**
+ * Builds the SELECT columns with a smart image resolver.
+ * Priority: valid http image column → attributes->>'image_url' → '/placeholder.svg'
+ * This ensures images always bind correctly even if the image column has bad data
+ * (e.g. images_count value like "6" or "1" from CSV mapping bugs).
+ */
+const PRODUCT_SELECT = `
+  id, name, sku, brand, category, color, size, price, rating, description, attributes,
+  CASE
+    WHEN image IS NOT NULL AND image LIKE 'http%' AND LENGTH(image) > 15
+      THEN image
+    WHEN attributes->>'image_url' IS NOT NULL AND attributes->>'image_url' LIKE 'http%'
+      THEN attributes->>'image_url'
+    ELSE '/placeholder.svg'
+  END AS image
+`;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const searchText = (body.search || "").toString().trim();
 
-    let sql = "SELECT * FROM products";
+    let sql = `SELECT ${PRODUCT_SELECT} FROM products`;
     let params: any[] = [];
 
     if (searchText) {
@@ -33,8 +50,6 @@ export async function POST(req: NextRequest) {
     sql += " ORDER BY id ASC";
 
     const dbResult = await dbQuery(sql, params);
-
-    // Return products directly as an array
     return NextResponse.json(dbResult.rows);
   } catch (error: any) {
     console.error("Products search route error:", {
@@ -52,7 +67,9 @@ export async function POST(req: NextRequest) {
 // Support GET for general listings
 export async function GET() {
   try {
-    const dbResult = await dbQuery("SELECT * FROM products ORDER BY id ASC LIMIT 100");
+    const dbResult = await dbQuery(
+      `SELECT ${PRODUCT_SELECT} FROM products ORDER BY id ASC LIMIT 100`
+    );
     return NextResponse.json(dbResult.rows);
   } catch (error: any) {
     return NextResponse.json(

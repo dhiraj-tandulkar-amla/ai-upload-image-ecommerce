@@ -23,6 +23,36 @@ export default function AdminPage() {
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
 
+  const [fixImagesLoading, setFixImagesLoading] = useState(false);
+  const [fixImagesResult, setFixImagesResult] = useState<any>(null);
+  const [brokenImageCount, setBrokenImageCount] = useState<number | null>(null);
+
+  async function checkBrokenImages() {
+    try {
+      const res = await fetch("/api/fix-images");
+      const data = await res.json();
+      setBrokenImageCount(data.brokenImageCount ?? 0);
+    } catch {
+      setBrokenImageCount(null);
+    }
+  }
+
+  async function handleFixImages() {
+    try {
+      setFixImagesLoading(true);
+      setFixImagesResult(null);
+      const res = await fetch("/api/fix-images", { method: "POST" });
+      const data = await res.json();
+      setFixImagesResult(data);
+      await checkDbStatus();
+      await checkBrokenImages();
+    } catch (err: any) {
+      setFixImagesResult({ success: false, error: err.message || "Request failed" });
+    } finally {
+      setFixImagesLoading(false);
+    }
+  }
+
   async function checkDbStatus() {
     try {
       setDbStatus((prev: any) => ({ ...prev, loading: true }));
@@ -50,6 +80,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     checkDbStatus();
+    checkBrokenImages();
   }, []);
 
   async function handleSetupDb() {
@@ -112,6 +143,32 @@ export default function AdminPage() {
             &larr; Back to Shop
           </Link>
         </div>
+
+        {/* Fix Images Banner — shown when broken images are detected */}
+        {brokenImageCount !== null && brokenImageCount > 0 && (
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <div>
+              <p className="text-sm font-bold text-amber-800">🖼️ {brokenImageCount} product{brokenImageCount !== 1 ? "s" : ""} have broken/missing images</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Amazon image URLs are stored in attributes but not set as the product image. Click to fix all at once.
+              </p>
+            </div>
+            <button
+              onClick={handleFixImages}
+              disabled={fixImagesLoading}
+              className="shrink-0 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+            >
+              {fixImagesLoading ? "Fixing..." : "Fix Images"}
+            </button>
+          </div>
+        )}
+        {fixImagesResult && (
+          <div className={`mb-6 p-4 rounded-xl border text-sm ${fixImagesResult.success ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-700"}`}>
+            {fixImagesResult.success
+              ? `✅ Fixed ${fixImagesResult.fixedCount} product image${fixImagesResult.fixedCount !== 1 ? "s" : ""} successfully.`
+              : `❌ Error: ${fixImagesResult.error}`}
+          </div>
+        )}
 
         {/* Database & OpenAI Connection Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -318,6 +375,15 @@ export default function AdminPage() {
                     <p className="text-red-600 font-semibold">{importResult.error}</p>
                   ) : (
                     <>
+                      {importResult.insertedCount === 0 && importResult.totalRows > 0 && (
+                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm font-bold text-red-700">⚠️ 0 products were saved to the database.</p>
+                          <p className="text-xs text-red-600 mt-1">
+                            This usually means the database table doesn&apos;t exist yet or the server wasn&apos;t restarted after the .env.local fix.
+                            Check the error details below and make sure you clicked <strong>Initialize Database</strong> first.
+                          </p>
+                        </div>
+                      )}
                       <div className="grid grid-cols-3 gap-2 text-center py-2 bg-white rounded-lg border">
                         <div>
                           <p className="text-xs text-gray-500 uppercase">Total Rows</p>
@@ -325,7 +391,7 @@ export default function AdminPage() {
                         </div>
                         <div className="border-x">
                           <p className="text-xs text-gray-500 uppercase">Success</p>
-                          <p className="text-lg font-bold text-emerald-600">{importResult.insertedCount}</p>
+                          <p className={`text-lg font-bold ${importResult.insertedCount > 0 ? "text-emerald-600" : "text-red-600"}`}>{importResult.insertedCount}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 uppercase">Errors</p>

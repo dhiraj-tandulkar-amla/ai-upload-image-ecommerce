@@ -75,11 +75,27 @@ export async function POST(request: Request) {
     };
 
     const nameIndex = getColumnIndex(["title", "name", "product name", "product_name", "heading"]);
-    const skuIndex = getColumnIndex(["sku", "product sku", "product_sku", "barcode", "id"]);
-    const imageIndex = getColumnIndex(["product image url", "product_image_url", "image url", "image_url", "variant image url", "variant_image_url", "image", "img", "url"]);
+    // 'asin' is a reliable unique ID in Amazon exports; try exact sku match first
+    const skuIndex = (() => {
+      const exact = headers.findIndex((h) => ["sku", "product sku", "product_sku", "asin", "barcode", "id"].includes(h));
+      return exact !== -1 ? exact : getColumnIndex(["sku", "product sku", "product_sku", "barcode"]);
+    })();
+    // EXACT match only for image — "includes" causes false positives e.g. "images_count".includes("img") = true
+    const imageIndex = (() => {
+      const exactNames = ["image_url", "product_image_url", "image url", "product image url", "variant_image_url", "variant image url", "img_url", "image", "img"];
+      return headers.findIndex((h) => exactNames.includes(h));
+    })();
     const brandIndex = getColumnIndex(["vendor", "brand", "manufacturer", "brand name", "brand_name"]);
-    const categoryIndex = getColumnIndex(["product category", "product_category", "type", "category", "type_name", "category name", "category_name"]);
-    const priceIndex = getColumnIndex(["price", "retail price", "retail_price", "cost", "compare-at price", "cost per item"]);
+    // 'categories' (plural, Amazon) + 'category' variants
+    const categoryIndex = (() => {
+      const exact = headers.findIndex((h) => ["categories", "category", "product category", "product_category", "type", "type_name", "category name", "category_name"].includes(h));
+      return exact !== -1 ? exact : getColumnIndex(["category", "product category", "product_category", "type_name", "category name", "category_name"]);
+    })();
+    // 'final_price' before 'initial_price' — use includes only as fallback
+    const priceIndex = (() => {
+      const exact = headers.findIndex((h) => ["final_price", "price", "retail_price", "retail price"].includes(h));
+      return exact !== -1 ? exact : getColumnIndex(["cost", "compare-at price", "cost per item"]);
+    })();
     const ratingIndex = getColumnIndex(["rating", "stars", "rating value"]);
     const descriptionIndex = getColumnIndex(["description", "body", "body (html)", "body_html", "summary", "text"]);
 
@@ -94,6 +110,10 @@ export async function POST(request: Request) {
     // Color and Size headers
     const colorIndex = getColumnIndex(["color (product.metafields.shopify.color-pattern)", "color", "colour"]);
     const sizeIndex = getColumnIndex(["size"]);
+
+    // Helper to strip embedded quotes and return clean numeric string
+    // Handles triple-quoted Amazon exports like """57.79"""
+    const cleanNumeric = (val: string) => val.replace(/^"+|"+$/g, "").trim();
 
     let insertedCount = 0;
     let errors: string[] = [];
@@ -174,9 +194,9 @@ export async function POST(request: Request) {
           Math.random().toString(36).substring(2, 6).toUpperCase();
       }
 
-      // Format remaining values
-      const price = parseFloat(getVal(priceIndex)) || 0.0;
-      const rating = parseFloat(getVal(ratingIndex)) || 4.0;
+      // Format remaining values — cleanNumeric strips triple-quoted values like """57.79"""
+      const price = parseFloat(cleanNumeric(getVal(priceIndex))) || 0.0;
+      const rating = parseFloat(cleanNumeric(getVal(ratingIndex))) || 4.0;
       image = image || "/placeholder.svg";
       brand = brand || "Unknown";
       category = category || "General";
@@ -235,12 +255,17 @@ export async function POST(request: Request) {
         );
         insertedCount++;
       } catch (err: any) {
+        console.error(`CSV Import - Row ${r + 2} (${sku}) failed:`, err.message);
         errors.push(`Row ${r + 2} (${sku}): ${err.message}`);
       }
     }
 
+    if (insertedCount === 0 && errors.length > 0) {
+      console.error("CSV Import: 0 rows inserted. First error:", errors[0]);
+    }
+
     return NextResponse.json({
-      success: true,
+      success: insertedCount > 0,
       totalRows: dataRows.length,
       insertedCount,
       errorCount: errors.length,
