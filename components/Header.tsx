@@ -156,7 +156,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex items-center gap-6">
             <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              AI Shop
+              ShopLens AI
             </Link>
             <Link href="/admin" className="hidden sm:inline-block text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
               Admin Console

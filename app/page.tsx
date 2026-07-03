@@ -1,77 +1,131 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Layout from "@/components/Layout";
+import images from "@/public/images/Image.png";
 
 export default function HomePage() {
+  const router = useRouter();
+  const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
+
+  const handleSearch = () => {
+    if (!searchText.trim()) return;
+    router.push(`/products?search=${encodeURIComponent(searchText)}`);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    try {
+      setLoading(true);
+      setStatusText("Analyzing image...");
+      
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch("/api/ai-search", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Search failed");
+      const data = await res.json();
+      
+      // Navigate to products with search results or query
+      if (data.description) {
+        router.push(`/products?search=${encodeURIComponent(data.description)}`);
+      } else {
+        router.push("/products");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatusText("Failed to analyze image");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Layout>
-      <section className="mx-auto flex max-w-7xl flex-1 flex-col items-center justify-center px-6 py-20 text-center relative overflow-hidden">
-        {/* Decorative background gradients */}
-        <div className="absolute -top-40 right-10 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute top-80 -left-20 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+      <div className="lg:flex justify-center">
+        <section
+          className=" px-6 py-10 bg-cover bg-center bg-no-repeat w-full flex justify-center"
+          style={{ backgroundImage: `url(${images.src})` }}
+        >
+          <div className="relative overflow-hidden rounded-3xl from-blue-50 via-white to-indigo-50 shadow-xl border border-blue-100 max-w-7xl w-full">
+            <div className="absolute -top-20 -right-20 h-72 w-72 rounded-full bg-blue-200 opacity-20 blur-3xl"></div>
+            <div className="absolute -bottom-24 -left-20 h-72 w-72 rounded-full bg-indigo-200 opacity-20 blur-3xl"></div>
 
-        <div className="max-w-3xl">
-          <h1 className="text-6xl font-extrabold tracking-tight text-gray-900 leading-none">
-            The Smartest Way to <br />
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Discover Products
-            </span>
-          </h1>
+            <div className="relative grid items-center gap-10 lg:grid-cols-2 p-10 lg:p-16 bg-white/40 backdrop-blur-sm lg:bg-white/10 lg:backdrop-blur-none">
+              <div>
+                <span className="inline-flex rounded-full bg-blue-100 px-4 py-1 text-sm font-semibold text-blue-700">
+                  AI Powered Search
+                </span>
 
-          <p className="mt-6 text-xl text-gray-500 max-w-2xl mx-auto font-medium leading-relaxed">
-            Search products using natural conversational commands or by uploading a photo. Experience instant visual matching, bundle item detection, and fluid checkout.
-          </p>
+                <h1 className="mt-5 text-5xl font-extrabold leading-tight text-gray-900">
+                  Find Products
+                  <span className="block text-blue-600">Using Image</span>
+                </h1>
 
-          <div className="mt-10 flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/products"
-              className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base px-8 py-4 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] cursor-pointer"
-            >
-              Explore Catalog &rarr;
-            </Link>
-            <Link
-              href="/admin"
-              className="rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-base px-8 py-4 shadow-xs transition-all hover:scale-[1.02] cursor-pointer"
-            >
-              Admin Dashboard
-            </Link>
-          </div>
-        </div>
+                <p className="mt-5 text-lg text-gray-600">
+                  Upload a product image or search by keyword. Our AI instantly
+                  identifies the
+                  <strong> category</strong>, <strong> brand</strong>,
+                  <strong> color</strong>, and finds similar products.
+                </p>
 
-        {/* Feature Cards Grid */}
-        <div className="mt-20 grid grid-cols-1 gap-8 sm:grid-cols-3 max-w-5xl">
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-xs text-left">
-            <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg mb-4">
-              📷
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <input
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="🔍 Search products..."
+                    className="flex-1 rounded-xl border border-gray-300 bg-white px-5 py-4 text-lg shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                  />
+
+                  <button
+                    onClick={handleSearch}
+                    className="rounded-xl bg-blue-600 px-8 py-4 font-semibold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg cursor-pointer"
+                  >
+                    Search
+                  </button>
+                </div>
+
+                <div className="mt-8">
+                  {loading ? (
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                      <span className="font-medium text-gray-600">
+                        {statusText}
+                      </span>
+                    </div>
+                  ) : (
+                    <label className="inline-flex cursor-pointer items-center gap-3 rounded-xl bg-gray-900 px-7 py-4 font-semibold text-white transition hover:bg-black">
+                      📤 Upload Product Image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-5 text-sm font-medium text-gray-600">
+                  <span>✅ Category Detection</span>
+                  <span>✅ Brand Recognition</span>
+                  <span>✅ Color Identification</span>
+                  <span>✅ Similar Products</span>
+                </div>
+              </div>
             </div>
-            <h3 className="font-bold text-gray-900 text-lg">Visual Search</h3>
-            <p className="text-gray-500 text-sm mt-2 leading-relaxed">
-              Click the camera icon in the search bar above to upload any product image. AI identifies it in seconds.
-            </p>
           </div>
-
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-xs text-left">
-            <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg mb-4">
-              📦
-            </div>
-            <h3 className="font-bold text-gray-900 text-lg">Bundle Detection</h3>
-            <p className="text-gray-500 text-sm mt-2 leading-relaxed">
-              Upload bundle or combo images. Our system identifies individual pieces and lets you add the whole set at once.
-            </p>
-          </div>
-
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-100 p-6 shadow-xs text-left">
-            <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-lg mb-4">
-              💬
-            </div>
-            <h3 className="font-bold text-gray-900 text-lg">NLP Refinement</h3>
-            <p className="text-gray-500 text-sm mt-2 leading-relaxed">
-              Refine your image results using chat instructions like "make it red", "show nike only", or "add a watch".
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </Layout>
   );
 }
