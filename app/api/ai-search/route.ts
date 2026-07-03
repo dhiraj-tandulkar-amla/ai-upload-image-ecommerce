@@ -7,79 +7,6 @@ const client = new OpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
 });
 
-// Compact system prompt — avoid verbose explanations, just the schema
-const systemPrompt =
-  `You are a product recognition AI. Analyze the image and output ONLY valid JSON (no markdown, no text).\n` +
-  `Schema: {"isBundle":bool,"bundleName":string,"products":[{"searchText":string,"name":string,"category":string,"color":string,"brand":string,"size":string}]}\n` +
-  `Rules: isBundle=true if multiple distinct products shown. searchText = best DB search query. size="N/A" if unknown.`;
-
-function cleanJSON(text: string): string {
-  let s = text.trim();
-  if (s.startsWith("```json")) s = s.slice(7);
-  else if (s.startsWith("```")) s = s.slice(3);
-  if (s.endsWith("```")) s = s.slice(0, -3);
-  return s.trim();
-}
-
-async function callOpenAI(
-  base64Image: string,
-  mimeType: string,
-  nlpCommand?: string
-): Promise<string> {
-  const userPrompt = nlpCommand
-    ? `Refine based on: "${nlpCommand}"`
-    : `Analyze this product image.`;
-
-  try {
-    if ((client as any).responses?.create) {
-      const response = await (client as any).responses.create({
-        model: "gpt-4.1",
-        max_output_tokens: 200,
-        input: [
-          {
-            role: "user",
-            content: [
-              { type: "input_text" as const, text: `${systemPrompt}\n\n${userPrompt}` },
-              {
-                type: "input_image" as const,
-                image_url: `data:${mimeType};base64,${base64Image}`,
-                detail: "low" as const,   // low detail = fewer vision tokens
-              },
-            ],
-          },
-        ],
-      });
-      return response.output_text.trim();
-    }
-  } catch (e) {
-    console.warn("responses.create failed, falling back:", e);
-  }
-
-  const chatResponse = await client.chat.completions.create({
-    model: "gpt-4.1",
-    max_tokens: 200,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: [
-          { type: "text", text: userPrompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:${mimeType};base64,${base64Image}`,
-              detail: "low",   // low detail = fewer vision tokens
-            },
-          },
-        ],
-      },
-    ],
-  });
-
-  return chatResponse.choices[0].message.content || "{}";
-}
-
 const IMAGE_SELECT = `
   id, name, sku, brand, category, color, size, price, rating,
   CASE
@@ -88,6 +15,98 @@ const IMAGE_SELECT = `
     ELSE '/placeholder.svg'
   END AS image
 `;
+
+/**
+ * Calls the AI with the refined keyword-generation prompt.
+ * Returns a plain-text 2–4 word search keyword (e.g. "Nike Running Shoes").
+ * If an NLP command is provided (e.g. "make it blue"), it is appended as a refinement instruction.
+ */
+async function generateSearchKeyword(
+  base64Image: string,
+  mimeType: string,
+  nlpCommand?: string
+): Promise<string> {
+  const basePrompt = `
+You are an expert product recognition AI.
+
+Analyze the uploaded product image and generate ONE optimized search keyword.
+
+Rules:
+- Keep the keyword concise, consistent, and search-friendly (ideally 2 to 4 words).
+- Avoid descriptive adjectives or fluff (e.g. do NOT add "high pressure", "plunger", "heavy duty", "original") unless they are part of the official brand or product name.
+- If the exact brand and model number/series are clearly visible, include them (e.g., "CAT Pumps 2537").
+- If the exact model/series is NOT clearly visible, keep the keyword generic (e.g., "CAT Pumps" or "Giant Pumps Parts").
+- Do not guess or assume details that are not visible.
+- Return only the search keyword on a single line. Do not return JSON or explanations.
+
+Examples:
+CAT Pumps 2537
+Nike Shoes
+Giant Pumps Plug
+AR North America Valve
+`.trim();
+
+  const userText = nlpCommand
+    ? `${basePrompt}\n\nAdditional user instruction: "${nlpCommand}" — incorporate this into the keyword if relevant.`
+    : basePrompt;
+
+  // Primary: Azure OpenAI responses API
+  const response = await (client as any).responses.create({
+    model: "gpt-4.1",
+    max_output_tokens: 20, // keyword is only a few words
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text" as const,
+            text: userText,
+          },
+          {
+            type: "input_image" as const,
+            image_url: `data:${mimeType};base64,${base64Image}`,
+            detail: "auto" as const,
+          },
+        ],
+      },
+    ],
+  });
+
+  return response.output_text.trim();
+}
+
+/**
+ * Searches the products table using the keyword.
+ * Splits into words and ANDs them across name, brand, category, color.
+ * Falls back to OR-matching all words if the AND query returns nothing.
+ */
+async function searchProducts(keyword: string, limit = 4) {
+  const words = keyword
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length === 0) return [];
+
+  const andConditions = words.map((word, i) => {
+    return `(LOWER(name) LIKE $${i + 1} OR LOWER(brand) LIKE $${i + 1} OR LOWER(category) LIKE $${i + 1} OR LOWER(color) LIKE $${i + 1} OR LOWER(sku) LIKE $${i + 1})`;
+  });
+  const params = words.map((w) => `%${w}%`);
+
+  const andSql = `SELECT ${IMAGE_SELECT} FROM products WHERE ${andConditions.join(" AND ")} LIMIT ${limit}`;
+  const andRes = await query(andSql, params);
+
+  if (andRes.rows.length > 0) return andRes.rows;
+
+  // Fallback: OR — return anything matching at least one word
+  const orConditions = words.map((_, i) => {
+    return `(LOWER(name) LIKE $${i + 1} OR LOWER(brand) LIKE $${i + 1} OR LOWER(category) LIKE $${i + 1} OR LOWER(color) LIKE $${i + 1} OR LOWER(sku) LIKE $${i + 1})`;
+  });
+  const orSql = `SELECT ${IMAGE_SELECT} FROM products WHERE ${orConditions.join(" OR ")} LIMIT ${limit}`;
+  const orRes = await query(orSql, params);
+
+  return orRes.rows;
+}
 
 export async function POST(request: Request) {
   try {
@@ -119,47 +138,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Image data missing" }, { status: 400 });
     }
 
-    const aiResponseText = await callOpenAI(base64Image, mimeType, nlpCommand);
-    const aiResult = JSON.parse(cleanJSON(aiResponseText));
+    // Step 1: Get keyword from AI
+    const keyword = await generateSearchKeyword(base64Image, mimeType, nlpCommand);
+    console.log("AI Search keyword:", keyword);
 
-    const isBundle = !!aiResult.isBundle;
-    const bundleName = aiResult.bundleName || "";
-    const extractedCriteria: any[] = aiResult.products || [];
-
-    let matchedProducts: any[] = [];
-
-    for (const p of extractedCriteria) {
-      const searchWords = (p.searchText || p.name || "")
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
-
-      let sql = `SELECT ${IMAGE_SELECT} FROM products`;
-      const params: any[] = [];
-
-      if (searchWords.length > 0) {
-        const conditions = searchWords.map((word: string, i: number) => {
-          params.push(`%${word}%`);
-          return `(LOWER(name) LIKE $${i + 1} OR LOWER(brand) LIKE $${i + 1} OR LOWER(category) LIKE $${i + 1} OR LOWER(color) LIKE $${i + 1})`;
-        });
-        sql += " WHERE " + conditions.join(" AND ");
-      }
-
-      sql += isBundle ? " LIMIT 1" : " LIMIT 4";
-
-      const dbRes = await query(sql, params);
-      if (dbRes.rows.length > 0) matchedProducts.push(...dbRes.rows);
-    }
-
-    const uniqueMap = new Map();
-    matchedProducts.forEach((item: any) => uniqueMap.set(item.id, item));
-    const uniqueProducts = Array.from(uniqueMap.values()).slice(0, 4);
+    // Step 2: Search DB with the keyword
+    const products = await searchProducts(keyword);
 
     return NextResponse.json({
-      isBundle,
-      bundleName,
-      products: uniqueProducts,
-      extractedCriteria,
+      isBundle: false,
+      bundleName: "",
+      products,
+      extractedCriteria: [{ searchText: keyword, name: keyword }],
       imageMime: mimeType,
       imageBase64: base64Image,
     });
