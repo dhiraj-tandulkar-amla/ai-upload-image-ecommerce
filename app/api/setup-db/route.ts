@@ -1,7 +1,23 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import OpenAI from "openai";
 
 export async function GET() {
+  let aiConnected = false;
+  let aiError: string | null = null;
+
+  try {
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL,
+    });
+    // Check key authenticity via lightweight models list call
+    await openai.models.list();
+    aiConnected = true;
+  } catch (err: any) {
+    aiError = err.message || "Failed to verify OpenAI API connection";
+  }
+
   try {
     const resProducts = await query(`
       SELECT EXISTS (
@@ -32,11 +48,15 @@ export async function GET() {
         cart_items: cartExists,
       },
       productCount,
+      aiConnected,
+      aiError,
     });
   } catch (error: any) {
     return NextResponse.json({
       connected: false,
       error: error.message || "Failed to connect to PostgreSQL database",
+      aiConnected,
+      aiError,
     });
   }
 }

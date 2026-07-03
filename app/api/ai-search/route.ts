@@ -86,7 +86,7 @@ async function callOpenAI(base64Image: string, mimeType: string, nlpCommand?: st
 
   // Fallback to standard chat completions
   const chatResponse = await client.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     messages: [
       {
         role: "system",

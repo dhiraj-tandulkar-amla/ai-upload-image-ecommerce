@@ -69,7 +69,7 @@ CRITICAL CONSTRAINTS (RESTRICTIONS):
 
     // Fallback to standard chat completions
     const chatResponse = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       messages: messages as any,
     });
 

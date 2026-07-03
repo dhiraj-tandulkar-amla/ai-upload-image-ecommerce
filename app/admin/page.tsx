@@ -11,6 +11,8 @@ export default function AdminPage() {
     connected: false,
     tables: { products: false, cart_items: false },
     productCount: 0,
+    aiConnected: false,
+    aiError: null,
     error: null,
   });
 
@@ -31,6 +33,8 @@ export default function AdminPage() {
         connected: data.connected,
         tables: data.tables || { products: false, cart_items: false },
         productCount: data.productCount || 0,
+        aiConnected: data.aiConnected || false,
+        aiError: data.aiError || null,
         error: data.error || null,
       });
     } catch (err: any) {
@@ -109,98 +113,147 @@ export default function AdminPage() {
           </Link>
         </div>
 
-        {/* Database Connection Status Card */}
-        <section className="bg-white rounded-2xl border p-6 mb-8 shadow-sm">
-          <h2 className="text-xl font-bold text-gray-950 mb-4 flex items-center gap-2">
-            Database Status
-            <span
-              className={`inline-block h-3 w-3 rounded-full ${
-                dbStatus.loading
-                  ? "bg-gray-400"
-                  : dbStatus.connected
-                  ? "bg-emerald-500"
-                  : "bg-red-500"
-              }`}
-            />
-          </h2>
-
-          {dbStatus.loading ? (
-            <p className="text-sm text-gray-500">Checking connection...</p>
-          ) : (
+        {/* Database & OpenAI Connection Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          {/* Database Connection Status Card */}
+          <section className="bg-white rounded-2xl border p-6 shadow-sm flex flex-col justify-between">
             <div>
-              {dbStatus.connected ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-600">
-                      Connection URL: <span className="font-mono text-xs text-gray-900 bg-gray-100 px-1 py-0.5 rounded">db.wtpjkejqjlgbolpyuodz.supabase.co</span>
-                    </p>
-                    <p className="text-sm font-medium text-gray-600">
-                      Status: <span className="text-emerald-700 font-semibold">Connected</span>
-                    </p>
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Products: <span className="text-blue-600 font-bold">{dbStatus.productCount}</span>
-                    </p>
-                  </div>
-                  <div className="space-y-2 border-l pl-4">
-                    <p className="text-sm font-semibold text-gray-700">Tables Status:</p>
-                    <div className="flex flex-col gap-1 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${dbStatus.tables.products ? "bg-emerald-500" : "bg-red-500"}`} />
-                        <span>products {dbStatus.tables.products ? "(Ready)" : "(Missing)"}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${dbStatus.tables.cart_items ? "bg-emerald-500" : "bg-red-500"}`} />
-                        <span>cart_items {dbStatus.tables.cart_items ? "(Ready)" : "(Missing)"}</span>
+              <h2 className="text-xl font-bold text-gray-950 mb-4 flex items-center gap-2">
+                Database Status
+                <span
+                  className={`inline-block h-3 w-3 rounded-full ${
+                    dbStatus.loading
+                      ? "bg-gray-400"
+                      : dbStatus.connected
+                      ? "bg-emerald-500"
+                      : "bg-red-500"
+                  }`}
+                />
+              </h2>
+
+              {dbStatus.loading ? (
+                <p className="text-sm text-gray-500">Checking connection...</p>
+              ) : (
+                <div>
+                  {dbStatus.connected ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-600">
+                        Connection URL: <span className="font-mono text-xs text-gray-900 bg-gray-100 px-1 py-0.5 rounded font-medium text-[11px] break-all">aws-1-ap-southeast-1.pooler.supabase.com</span>
+                      </p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Status: <span className="text-emerald-700 font-semibold">Connected</span>
+                      </p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Total Products: <span className="text-blue-600 font-bold">{dbStatus.productCount}</span>
+                      </p>
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-gray-700 mb-1">Tables Status:</p>
+                        <div className="flex flex-col gap-1 text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${dbStatus.tables.products ? "bg-emerald-500" : "bg-red-500"}`} />
+                            <span>products {dbStatus.tables.products ? "(Ready)" : "(Missing)"}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${dbStatus.tables.cart_items ? "bg-emerald-500" : "bg-red-500"}`} />
+                            <span>cart_items {dbStatus.tables.cart_items ? "(Ready)" : "(Missing)"}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200">
-                  <p className="text-sm font-bold">Failed to connect to Supabase database.</p>
-                  <p className="text-xs mt-1 font-mono">{dbStatus.error}</p>
-                  <p className="text-xs mt-2">
-                    Please ensure that your password is replaced correctly in <code className="bg-red-100 px-1 py-0.5 rounded">.env.local</code>.
-                  </p>
+                  ) : (
+                    <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200">
+                      <p className="text-sm font-bold">Failed to connect to Supabase.</p>
+                      <p className="text-xs mt-1 font-mono break-all">{dbStatus.error}</p>
+                      <p className="text-xs mt-2">
+                        Please ensure that your password is replaced correctly in <code className="bg-red-100 px-1 py-0.5 rounded">.env.local</code>.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
 
-          {!dbStatus.loading && dbStatus.connected && (!dbStatus.tables.products || !dbStatus.tables.cart_items) && (
-            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-amber-800">Database tables have not been created yet.</p>
-                <p className="text-xs text-amber-700 mt-0.5">Click Setup Tables to initialize the schema.</p>
+            {!dbStatus.loading && dbStatus.connected && (!dbStatus.tables.products || !dbStatus.tables.cart_items) && (
+              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-amber-800">Database tables missing.</p>
+                  <p className="text-[10px] text-amber-700 mt-0.5">Click Setup to initialize.</p>
+                </div>
+                <button
+                  onClick={handleSetupDb}
+                  disabled={setupLoading}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-semibold text-xs px-3 py-1.5 rounded-lg"
+                >
+                  {setupLoading ? "Setting up..." : "Setup"}
+                </button>
               </div>
-              <button
-                onClick={handleSetupDb}
-                disabled={setupLoading}
-                className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-semibold text-sm px-4 py-2 rounded-lg"
-              >
-                {setupLoading ? "Setting up..." : "Setup Tables"}
-              </button>
-            </div>
-          )}
+            )}
 
-          {!dbStatus.loading && dbStatus.connected && dbStatus.tables.products && dbStatus.tables.cart_items && (
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={handleSetupDb}
-                disabled={setupLoading}
-                className="border hover:bg-gray-50 text-gray-700 font-semibold text-sm px-4 py-2 rounded-lg"
-              >
-                {setupLoading ? "Running..." : "Reset/Re-setup Tables"}
-              </button>
-            </div>
-          )}
+            {!dbStatus.loading && dbStatus.connected && dbStatus.tables.products && dbStatus.tables.cart_items && (
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={handleSetupDb}
+                  disabled={setupLoading}
+                  className="border hover:bg-gray-50 text-gray-700 font-semibold text-xs px-3 py-1.5 rounded-lg cursor-pointer"
+                >
+                  {setupLoading ? "Running..." : "Reset Tables"}
+                </button>
+              </div>
+            )}
 
-          {setupResult && (
-            <div className={`mt-4 p-3 rounded-lg text-xs font-mono border ${setupResult.startsWith("Success") ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"}`}>
-              {setupResult}
+            {setupResult && (
+              <div className={`mt-4 p-3 rounded-lg text-xs font-mono border ${setupResult.startsWith("Success") ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                {setupResult}
+              </div>
+            )}
+          </section>
+
+          {/* OpenAI API Key Status Card */}
+          <section className="bg-white rounded-2xl border p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-950 mb-4 flex items-center gap-2">
+                AI Service Status
+                <span
+                  className={`inline-block h-3 w-3 rounded-full ${
+                    dbStatus.loading
+                      ? "bg-gray-400"
+                      : dbStatus.aiConnected
+                      ? "bg-emerald-500"
+                      : "bg-red-500"
+                  }`}
+                />
+              </h2>
+
+              {dbStatus.loading ? (
+                <p className="text-sm text-gray-500">Checking AI connection...</p>
+              ) : (
+                <div>
+                  {dbStatus.aiConnected ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-600">
+                        Status: <span className="text-emerald-700 font-semibold">Active & Working</span>
+                      </p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Model: <span className="font-mono text-xs text-gray-900 bg-gray-100 px-1 py-0.5 rounded">gpt-4.1</span>
+                      </p>
+                      <p className="text-xs text-gray-400 leading-relaxed mt-2">
+                        AI search, bundle identification, and comparison chat features are fully operational.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200">
+                      <p className="text-sm font-bold">AI Connection Failed.</p>
+                      <p className="text-xs mt-1 font-mono break-all">{dbStatus.aiError || "API Key missing or invalid"}</p>
+                      <p className="text-xs mt-2">
+                        Ensure your <code className="bg-red-100 px-1 py-0.5 rounded">OPENAI_API_KEY</code> and <code className="bg-red-100 px-1 py-0.5 rounded">OPENAI_BASE_URL</code> are configured in <code className="bg-red-100 px-1 py-0.5 rounded">.env.local</code>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
+        </div>
 
         {/* CSV Import Card */}
         {dbStatus.connected && dbStatus.tables.products && (
