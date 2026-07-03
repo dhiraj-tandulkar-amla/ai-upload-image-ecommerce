@@ -131,9 +131,11 @@ export default function AdminPage() {
                 />
               </h2>
 
-              {dbStatus.loading ? (
+              {dbStatus.loading && (
                 <p className="text-sm text-gray-500">Checking connection...</p>
-              ) : (
+              )}
+
+              {!dbStatus.loading && (
                 <div>
                   {dbStatus.connected ? (
                     <div className="space-y-2">
@@ -224,9 +226,11 @@ export default function AdminPage() {
                 />
               </h2>
 
-              {dbStatus.loading ? (
+              {dbStatus.loading && (
                 <p className="text-sm text-gray-500">Checking AI connection...</p>
-              ) : (
+              )}
+
+              {!dbStatus.loading && (
                 <div>
                   {dbStatus.aiConnected ? (
                     <div className="space-y-2">
