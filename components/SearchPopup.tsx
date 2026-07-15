@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+import Link from "next/link";
 import { formatProductImage } from "@/lib/utils";
 
 function getCartSessionId(): string {
@@ -81,7 +81,7 @@ export default function SearchPopup({ isOpen, onClose, initialData, onCartUpdate
       setCartLoading(productId);
       const res = await fetch("/api/cart", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "x-cart-session-id": getCartSessionId()
         },
@@ -107,7 +107,7 @@ export default function SearchPopup({ isOpen, onClose, initialData, onCartUpdate
       setBundleCartLoading(true);
       const res = await fetch("/api/cart", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "x-cart-session-id": getCartSessionId()
         },
@@ -219,6 +219,21 @@ export default function SearchPopup({ isOpen, onClose, initialData, onCartUpdate
                     </div>
                   ))}
                 </div>
+
+                {data.extractedCriteria?.[0]?.searchText && (
+                  <div className="mt-3">
+                    <Link
+                      href={`/products?search=${encodeURIComponent(data.extractedCriteria?.[0]?.searchText || "")}`}
+                      onClick={onClose}
+                      className="w-full inline-flex items-center justify-center px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-300 text-gray-700 hover:text-gray-950 font-semibold text-xs rounded-xl shadow-sm transition-all gap-1.5"
+                    >
+                      <span>Show all options</span>
+                      <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  </div>
+                )}
 
                 {isBundle && (
                   <div className="mt-4 p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between">
